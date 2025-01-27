@@ -1,0 +1,535 @@
+openapi: 3.0.0
+info:
+  title: Fluxo de Caixa API
+  version: 1.0.0
+  description: API para gerenciar um fluxo de caixa contábil.
+tags:
+  - name: auth
+    description: Endpoints relacionados à autenticação.
+  - name: users
+    description: Gerenciamento de usuários.
+  - name: accounts
+    description: Gerenciamento de contas do fluxo de caixa.
+  - name: transactions
+    description: Gerenciamento de transações financeiras.
+  - name: reports
+    description: Geração de relatórios financeiros.
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+  schemas:
+    AuthToken:
+      type: object
+      properties:
+        token:
+          type: string
+        refresh_token:
+          type: string
+    User:
+      type: object
+      properties:
+        id:
+          type: integer
+        name:
+          type: string
+        email:
+          type: string
+        password:
+          type: string
+        role:
+          type: string
+          enum:
+            - admin
+            - user
+    Account:
+      type: object
+      properties:
+        id:
+          type: integer
+        name:
+          type: string
+        balance:
+          type: number
+    Transaction:
+      type: object
+      properties:
+        id:
+          type: integer
+        account_id:
+          type: integer
+        type:
+          type: string
+        amount:
+          type: number
+        date:
+          type: string
+          format: date
+        description:
+          type: string
+    SummaryReport:
+      type: object
+      properties:
+        total_credit:
+          type: number
+        total_debit:
+          type: number
+        net_balance:
+          type: number
+        transactions_count:
+          type: integer
+    OperationStatus:
+      type: object
+      properties:
+        status:
+          type: integer
+        mensagem:
+          type: string
+    TraceIdResponse:
+      type: object
+      properties:
+        traceid:
+          type: string
+          format: uuid
+paths:
+  /auth/login:
+    post:
+      tags:
+        - auth
+      summary: Autenticação de usuário
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                username:
+                  type: string
+                password:
+                  type: string
+              required:
+                - username
+                - password
+      responses:
+        '200':
+          description: Autenticação bem-sucedida
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AuthToken'
+  /auth/refresh:
+    post:
+      security:
+        - bearerAuth: []
+      tags:
+        - auth
+      summary: Renovar o token de autenticação
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                refresh_token:
+                  type: string
+              required:
+                - refresh_token
+      responses:
+        '200':
+          description: Token renovado com sucesso
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AuthToken'
+  /users:
+    get:
+      security:
+        - bearerAuth: []
+      tags:
+        - users
+      summary: Listar todos os usuários
+      responses:
+        '200':
+          description: Lista de usuários
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/User'
+    post:
+      security:
+        - bearerAuth: []
+      tags:
+        - users
+      summary: Criação de usuário
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/User'
+      responses:
+        '201':
+          description: Usuário criado com sucesso
+        '202':
+          description: Operação em andamento
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TraceIdResponse'
+        '422':
+          description: Erro ao processar entidade
+  /users/{id}:
+    get:
+      security:
+        - bearerAuth: []
+      tags:
+        - users
+      summary: Consultar usuário por ID
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: Detalhes do usuário
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/User'
+    put:
+      security:
+        - bearerAuth: []
+      tags:
+        - users
+      summary: Atualizar usuário
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/User'
+      responses:
+        '200':
+          description: Usuário atualizado com sucesso
+    delete:
+      security:
+        - bearerAuth: []
+      tags:
+        - users
+      summary: Deletar usuário
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        '204':
+          description: Usuário deletado com sucesso
+  /users/status/{traceid}:
+    get:
+      security:
+        - bearerAuth: []
+      tags:
+        - users
+      summary: Consultar status de operação assíncrona
+      parameters:
+        - name: traceid
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Status da operação
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OperationStatus'
+  /accounts:
+    get:
+      security:
+        - bearerAuth: []
+      tags:
+        - accounts
+      summary: Listar todas as contas
+      responses:
+        '200':
+          description: Lista de contas
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Account'
+        '204':
+          description: Nenhuma conta encontrada
+    post:
+      security:
+        - bearerAuth: []
+      tags:
+        - accounts
+      summary: Criar uma nova conta
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/Account'
+      responses:
+        '201':
+          description: Conta criada com sucesso
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Account'
+        '202':
+          description: Operação em andamento
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TraceIdResponse'
+        '422':
+          description: Erro ao processar entidade
+  /accounts/{id}:
+    get:
+      security:
+        - bearerAuth: []
+      tags:
+        - accounts
+      summary: Consultar conta por ID
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: Detalhes da conta
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Account'
+    put:
+      security:
+        - bearerAuth: []
+      tags:
+        - accounts
+      summary: Atualizar conta
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/Account'
+      responses:
+        '200':
+          description: Conta atualizada com sucesso
+    delete:
+      security:
+        - bearerAuth: []
+      tags:
+        - accounts
+      summary: Deletar conta
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        '204':
+          description: Conta deletada com sucesso
+  /accounts/status/{traceid}:
+    get:
+      security:
+        - bearerAuth: []
+      tags:
+        - accounts
+      summary: Consultar status de operação assíncrona
+      parameters:
+        - name: traceid
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Status da operação
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OperationStatus'
+  /transactions:
+    get:
+      security:
+        - bearerAuth: []
+      tags:
+        - transactions
+      summary: Listar todas as transações
+      responses:
+        '200':
+          description: Lista de transações
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Transaction'
+        '204':
+          description: Nenhuma transação encontrada
+    post:
+      security:
+        - bearerAuth: []
+      tags:
+        - transactions
+      summary: Criar uma nova transação
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/Transaction'
+      responses:
+        '201':
+          description: Transação criada com sucesso
+        '202':
+          description: Operação em andamento
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TraceIdResponse'
+        '422':
+          description: Erro ao processar entidade
+  /transactions/{id}:
+    get:
+      security:
+        - bearerAuth: []
+      tags:
+        - transactions
+      summary: Consultar transação por ID
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: Detalhes da transação
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Transaction'
+    put:
+      security:
+        - bearerAuth: []
+      tags:
+        - transactions
+      summary: Atualizar transação
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/Transaction'
+      responses:
+        '200':
+          description: Transação atualizada com sucesso
+    delete:
+      security:
+        - bearerAuth: []
+      tags:
+        - transactions
+      summary: Deletar transação
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        '204':
+          description: Transação deletada com sucesso
+  /transactions/status/{traceid}:
+    get:
+      security:
+        - bearerAuth: []
+      tags:
+        - transactions
+      summary: Consultar status de operação assíncrona
+      parameters:
+        - name: traceid
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Status da operação
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OperationStatus'
+  /reports/summary:
+    get:
+      security:
+        - bearerAuth: []
+      tags:
+        - reports
+      summary: Gerar um relatório de resumo
+      parameters:
+        - name: date_from
+          in: query
+          schema:
+            type: string
+            format: date
+        - name: date_to
+          in: query
+          schema:
+            type: string
+            format: date
+        - name: account_id
+          in: query
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: Resumo do relatório
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SummaryReport'
+        '204':
+          description: Nenhum dado encontrado para o relatório
+       
